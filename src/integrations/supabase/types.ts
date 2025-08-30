@@ -14,6 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
+      credits_ledger: {
+        Row: {
+          created_at: string
+          credits_added: number
+          description: string | null
+          id: string
+          payment_id: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_added: number
+          description?: string | null
+          id?: string
+          payment_id?: string | null
+          transaction_type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_added?: number
+          description?: string | null
+          id?: string
+          payment_id?: string | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credits_ledger_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          credits_to_add: number
+          currency: string
+          failure_reason: string | null
+          id: string
+          payment_method: string | null
+          razorpay_order_id: string
+          razorpay_payment_id: string | null
+          razorpay_signature: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          credits_to_add: number
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          payment_method?: string | null
+          razorpay_order_id: string
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credits_to_add?: number
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          payment_method?: string | null
+          razorpay_order_id?: string
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -49,7 +135,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      process_successful_payment: {
+        Args: {
+          p_payment_id: string
+          p_payment_method?: string
+          p_razorpay_payment_id: string
+          p_razorpay_signature: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

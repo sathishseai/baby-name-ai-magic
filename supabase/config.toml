@@ -11,57 +11,22 @@ max_rows = 1000
 [auth]
 enabled = true
 port = 54324
-site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://lovable.dev"]
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://rfjshqjhscmcwlodfltc.supabase.co"]
 jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+security_update_password_require_reauthentication = true
 enable_signup = true
-email_double_confirm_changes = true
-enable_manual_linking = false
-
-[auth.email]
-enable_signup = true
-double_confirm_changes = true
 enable_confirmations = false
 
-[db]
-port = 54322
-
-[db.pooler]
-enabled = false
-port = 54329
-pool_mode = "transaction"
-default_pool_size = 20
-max_client_conn = 100
-
-[realtime]
+[edge_functions]
 enabled = true
-port = 54323
-ip_version = "ipv4"
 
-[studio]
-enabled = true
-port = 54323
-api_url = "http://127.0.0.1:54321"
+[functions.create-razorpay-order]
+verify_jwt = true
 
-[inbucket]
-enabled = true
-port = 54324
-smtp_port = 54325
-pop3_port = 54326
-
-[storage]
-enabled = true
-port = 54325
-file_size_limit = "50MiB"
-
-[analytics]
-enabled = false
-port = 54327
-vector_port = 54328
-backend = "postgres"
+[functions.verify-razorpay-payment]
+verify_jwt = true
 
 [functions.n8n-proxy]
-verify_jwt = false
-
-[edge_runtime]
-inspector_port = 54321
+verify_jwt = true
