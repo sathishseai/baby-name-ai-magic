@@ -12,13 +12,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import NameResults from "@/components/results/NameResults";
-
-interface NameResult {
-  name: string;
-  meaning?: string;
-  origin?: string;
-  gender?: string;
-}
+import { parseNamesFromText, type NameResult } from "@/utils/nameParser";
 
 const BabyNameForm = () => {
   const [date, setDate] = useState<Date>();
@@ -69,11 +63,35 @@ const BabyNameForm = () => {
     return null;
   };
 
-  // Helper function to normalize various response formats
+  // Enhanced function to normalize various response formats including text
   const normalizeResults = (data: any): NameResult[] => {
     console.log("Normalizing webhook response:", data);
     
     if (!data) return [];
+    
+    // Handle text responses (like the n8n output format)
+    if (typeof data === 'string') {
+      try {
+        // Try to parse as JSON first
+        const parsed = JSON.parse(data);
+        return normalizeResults(parsed);
+      } catch (e) {
+        // If not JSON, try to parse as formatted text
+        const textResults = parseNamesFromText(data);
+        console.log("Parsed text results:", textResults);
+        return textResults;
+      }
+    }
+    
+    // Handle objects with an 'output' property (like your n8n response)
+    if (typeof data === 'object' && data.output) {
+      if (typeof data.output === 'string') {
+        const textResults = parseNamesFromText(data.output);
+        console.log("Parsed output text results:", textResults);
+        return textResults;
+      }
+      return normalizeResults(data.output);
+    }
     
     // Handle arrays directly
     if (Array.isArray(data)) {
@@ -99,19 +117,6 @@ const BabyNameForm = () => {
       if (singleResult) {
         console.log("Normalized single result:", [singleResult]);
         return [singleResult];
-      }
-    }
-    
-    // Handle string responses (maybe JSON)
-    if (typeof data === 'string') {
-      try {
-        const parsed = JSON.parse(data);
-        return normalizeResults(parsed);
-      } catch (e) {
-        // Treat as single name
-        const result = { name: data.trim() };
-        console.log("Normalized string result:", [result]);
-        return [result];
       }
     }
     
