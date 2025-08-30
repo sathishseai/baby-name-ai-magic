@@ -1,10 +1,14 @@
 
 import { Button } from "@/components/ui/button";
-import { Baby, Menu, User, CreditCard } from "lucide-react";
+import { Baby, Menu, CreditCard } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import AuthDialog from "@/components/auth/AuthDialog";
+import UserMenu from "@/components/auth/UserMenu";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, profile, loading } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-effect border-b">
@@ -28,17 +32,32 @@ const Header = () => {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <CreditCard className="w-4 h-4 text-primary" />
-              <span className="text-muted-foreground">2 Credits</span>
-            </div>
-            <Button variant="outline" size="sm">
-              <User className="w-4 h-4 mr-2" />
-              Sign In
-            </Button>
-            <Button size="sm" className="gradient-primary text-white">
-              Get Started
-            </Button>
+            {!loading && (
+              <>
+                {user && profile ? (
+                  <>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CreditCard className="w-4 h-4 text-primary" />
+                      <span className="text-muted-foreground">{profile.credits} Credits</span>
+                    </div>
+                    <UserMenu />
+                  </>
+                ) : (
+                  <>
+                    <AuthDialog>
+                      <Button variant="outline" size="sm">
+                        Sign In
+                      </Button>
+                    </AuthDialog>
+                    <AuthDialog>
+                      <Button size="sm" className="gradient-primary text-white">
+                        Get Started
+                      </Button>
+                    </AuthDialog>
+                  </>
+                )}
+              </>
+            )}
           </div>
 
           <Button
@@ -64,13 +83,26 @@ const Header = () => {
                 About
               </a>
               <div className="pt-4 space-y-2">
-                <Button variant="outline" size="sm" className="w-full">
-                  <User className="w-4 h-4 mr-2" />
-                  Sign In
-                </Button>
-                <Button size="sm" className="w-full gradient-primary text-white">
-                  Get Started
-                </Button>
+                {!loading && (
+                  <>
+                    {user && profile ? (
+                      <UserMenu />
+                    ) : (
+                      <>
+                        <AuthDialog>
+                          <Button variant="outline" size="sm" className="w-full">
+                            Sign In
+                          </Button>
+                        </AuthDialog>
+                        <AuthDialog>
+                          <Button size="sm" className="w-full gradient-primary text-white">
+                            Get Started
+                          </Button>
+                        </AuthDialog>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             </nav>
           </div>
