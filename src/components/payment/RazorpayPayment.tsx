@@ -1,7 +1,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreditCard, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +20,7 @@ declare global {
 
 const RazorpayPayment = ({ credits, amount, onSuccess }: RazorpayPaymentProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const { user, profile, refetch } = useAuth();
+  const { user, profile, refetchProfile } = useAuth();
   const { toast } = useToast();
 
   const loadRazorpayScript = () => {
@@ -102,7 +101,7 @@ const RazorpayPayment = ({ credits, amount, onSuccess }: RazorpayPaymentProps) =
             }
 
             // Refresh user profile to get updated credits
-            await refetch();
+            await refetchProfile();
 
             toast({
               title: "Payment Successful!",
