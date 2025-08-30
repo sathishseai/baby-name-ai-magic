@@ -10,6 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import NameResults from "@/components/results/NameResults";
 
 interface NameResult {
@@ -129,61 +130,40 @@ const BabyNameForm = () => {
       birthDate: date ? format(date, "yyyy-MM-dd") : null
     };
     
-    console.log("Submitting data to webhook:", submissionData);
+    console.log("Submitting data to Supabase Edge Function proxy:", submissionData);
     
     try {
-      const response = await fetch('https://n8n.srv932017.hstgr.cloud/webhook-test/getbabyname', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submissionData),
+      const { data, error } = await supabase.functions.invoke('n8n-proxy', {
+        body: submissionData,
       });
 
-      console.log("Response status:", response.status);
-      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+      console.log("Edge Function response:", { data, error });
 
-      if (response.ok) {
-        let result: any;
-        const contentType = response.headers.get('content-type');
-        
-        if (contentType && contentType.includes('application/json')) {
-          result = await response.json();
-        } else {
-          // Handle non-JSON responses
-          const textResult = await response.text();
-          console.log("Non-JSON response received:", textResult);
-          try {
-            result = JSON.parse(textResult);
-          } catch (e) {
-            result = textResult;
-          }
-        }
-        
-        console.log("Webhook response:", result);
-        setRawResponse(result);
-        
-        const nameResults = normalizeResults(result);
-        setResults(nameResults);
-        
-        if (nameResults.length > 0) {
-          toast({
-            title: "Success!",
-            description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you.`,
-          });
-        } else {
-          toast({
-            title: "No Names Found",
-            description: "The webhook returned data but no names could be extracted. Check the debug panel for details.",
-            variant: "destructive",
-          });
-          setShowDebug(true);
-        }
+      if (error) {
+        throw new Error(error.message || 'Failed to call Edge Function');
+      }
+      
+      console.log("Webhook response via proxy:", data);
+      setRawResponse(data);
+      
+      const nameResults = normalizeResults(data);
+      setResults(nameResults);
+      
+      if (nameResults.length > 0) {
+        toast({
+          title: "Success!",
+          description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you.`,
+        });
       } else {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        toast({
+          title: "No Names Found",
+          description: "The webhook returned data but no names could be extracted. Check the debug panel for details.",
+          variant: "destructive",
+        });
+        setShowDebug(true);
       }
     } catch (error) {
-      console.error("Error calling webhook:", error);
+      console.error("Error calling Edge Function proxy:", error);
       toast({
         title: "Error",
         description: "Failed to generate names. Please try again.",
