@@ -47,7 +47,7 @@ const BabyNameForm = () => {
     console.log("Submitting data to webhook:", submissionData);
     
     try {
-      const response = await fetch('https://n8n.srv930637.hstgr.cloud/webhook-test/getbabyname', {
+      const response = await fetch('https://n8n.srv932017.hstgr.cloud/webhook-test/getbabyname', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
