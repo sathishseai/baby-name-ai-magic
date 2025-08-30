@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import NameResults from "@/components/results/NameResults";
 import { parseNamesFromText, tryParseJson, stripCodeFences, type NameResult } from "@/utils/nameParser";
+import { useAuth } from "@/hooks/useAuth";
 
 const BabyNameForm = () => {
   const [date, setDate] = useState<Date>();
@@ -22,6 +23,7 @@ const BabyNameForm = () => {
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [showDebug, setShowDebug] = useState(false);
   const { toast } = useToast();
+  const { user, profile, refetchProfile } = useAuth();
   const [formData, setFormData] = useState({
     gender: "",
     language: "",
@@ -132,6 +134,27 @@ const BabyNameForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if user is authenticated
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to generate names.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if user has sufficient credits
+    if (!profile || profile.credits < 1) {
+      toast({
+        title: "Insufficient credits",
+        description: "You need at least 1 credit to generate names. Please purchase credits to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setResults([]);
     setRawResponse(null);
@@ -151,6 +174,16 @@ const BabyNameForm = () => {
       console.log("Edge Function response:", { data, error });
 
       if (error) {
+        // Handle specific error cases
+        if (error.message?.includes('Insufficient credits')) {
+          toast({
+            title: "Insufficient Credits",
+            description: "You don't have enough credits to generate names. Please purchase more credits.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         throw new Error(error.message || 'Failed to call Edge Function');
       }
       
@@ -163,8 +196,11 @@ const BabyNameForm = () => {
       if (nameResults.length > 0) {
         toast({
           title: "Success!",
-          description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you.`,
+          description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you. 1 credit has been deducted.`,
         });
+        
+        // Refresh the user profile to get updated credit count
+        await refetchProfile();
       } else {
         toast({
           title: "No Names Found",
@@ -196,6 +232,14 @@ const BabyNameForm = () => {
           <CardDescription className="text-lg">
             Fill in your preferences and let our AI suggest beautiful names for your baby
           </CardDescription>
+          {profile && (
+            <div className="inline-flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full mt-4">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">
+                Available Credits: {profile.credits}
+              </span>
+            </div>
+          )}
         </CardHeader>
         
         <CardContent>
@@ -324,10 +368,13 @@ const BabyNameForm = () => {
             <div className="pt-6">
               <Button 
                 type="submit" 
-                disabled={isSubmitting}
-                className="w-full gradient-primary text-white text-lg py-6 hover:scale-105 transition-transform"
+                disabled={isSubmitting || !user || (profile && profile.credits < 1)}
+                className="w-full gradient-primary text-white text-lg py-6 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                {isSubmitting ? "Generating..." : "Generate Names (1 Credit)"}
+                {isSubmitting ? "Generating..." : 
+                 !user ? "Sign In Required" :
+                 (profile && profile.credits < 1) ? "Insufficient Credits" :
+                 "Generate Names (1 Credit)"}
                 <Sparkles className="ml-2 w-5 h-5" />
               </Button>
             </div>

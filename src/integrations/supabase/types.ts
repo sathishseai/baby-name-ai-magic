@@ -135,6 +135,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_credit: {
+        Args: { p_description?: string; p_user_id: string }
+        Returns: boolean
+      }
       process_successful_payment: {
         Args: {
           p_payment_id: string
