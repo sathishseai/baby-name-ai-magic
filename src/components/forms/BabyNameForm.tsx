@@ -72,7 +72,7 @@ const BabyNameForm = () => {
     
     if (!data) return [];
     
-    // Handle text responses (prioritize JSON parsing)
+    // Handle text responses (prioritize JSON parsing with enhanced extraction)
     if (typeof data === 'string') {
       const parsed = tryParseJson(data);
       if (parsed) {

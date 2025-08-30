@@ -9,20 +9,54 @@ export interface NameResult {
 export const stripCodeFences = (text: string): string => {
   if (!text) return text;
   const trimmed = text.trim();
-  const fenceRegex = /^\s*```(?:json|javascript|js|ts|txt)?\s*\r?\n([\s\S]*?)\r?\n```\s*$/i;
+  
+  // Look for the first code fence block anywhere in the string
+  const fenceRegex = /```(?:json|javascript|js|ts|txt)?\s*\n([\s\S]*?)\n```/i;
   const match = trimmed.match(fenceRegex);
-  if (match) return match[1].trim();
-  // Also handle inline fenced blocks that may not exactly match above
+  
+  if (match) {
+    return match[1].trim();
+  }
+  
+  // Fallback: remove leading/trailing fences if they exist at start/end
   return trimmed.replace(/^```(?:[^\n]*)?\n?/, '').replace(/```$/, '').trim();
 };
 
-export const tryParseJson = <T = unknown>(text: string): T | null => {
+export const extractJsonFromString = (text: string): any => {
+  if (!text) return null;
+  
+  // First try: direct JSON parse
   try {
-    const cleaned = stripCodeFences(text);
-    return JSON.parse(cleaned) as T;
+    return JSON.parse(text.trim());
   } catch {
-    return null;
+    // Second try: extract from code fences
+    try {
+      const cleaned = stripCodeFences(text);
+      return JSON.parse(cleaned);
+    } catch {
+      // Third try: find JSON array or object in the string
+      const arrayMatch = text.match(/\[[\s\S]*?\]/);
+      if (arrayMatch) {
+        try {
+          return JSON.parse(arrayMatch[0]);
+        } catch {}
+      }
+      
+      const objectMatch = text.match(/\{[\s\S]*?\}/);
+      if (objectMatch) {
+        try {
+          return JSON.parse(objectMatch[0]);
+        } catch {}
+      }
+      
+      return null;
+    }
   }
+};
+
+export const tryParseJson = <T = unknown>(text: string): T | null => {
+  const result = extractJsonFromString(text);
+  return result as T | null;
 };
 
 export const parseNamesFromText = (text: string): NameResult[] => {
