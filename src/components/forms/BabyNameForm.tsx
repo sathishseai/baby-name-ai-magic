@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,10 +10,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import NameResults from "@/components/results/NameResults";
+
+interface NameResult {
+  name: string;
+  meaning?: string;
+  origin?: string;
+  gender?: string;
+}
 
 const BabyNameForm = () => {
   const [date, setDate] = useState<Date>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [results, setResults] = useState<NameResult[]>([]);
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     gender: "",
@@ -38,6 +46,7 @@ const BabyNameForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setResults([]);
     
     const submissionData = {
       ...formData,
@@ -58,9 +67,25 @@ const BabyNameForm = () => {
       if (response.ok) {
         const result = await response.json();
         console.log("Webhook response:", result);
+        
+        // Handle different response formats
+        let nameResults: NameResult[] = [];
+        
+        if (Array.isArray(result)) {
+          nameResults = result;
+        } else if (result.names && Array.isArray(result.names)) {
+          nameResults = result.names;
+        } else if (result.data && Array.isArray(result.data)) {
+          nameResults = result.data;
+        } else if (typeof result === 'object' && result.name) {
+          nameResults = [result];
+        }
+        
+        setResults(nameResults);
+        
         toast({
           title: "Success!",
-          description: "Names are being generated for you.",
+          description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you.`,
         });
       } else {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -226,6 +251,8 @@ const BabyNameForm = () => {
           </form>
         </CardContent>
       </Card>
+
+      <NameResults results={results} isLoading={isSubmitting} />
     </div>
   );
 };
