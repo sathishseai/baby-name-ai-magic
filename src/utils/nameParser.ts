@@ -6,6 +6,25 @@ export interface NameResult {
   gender?: string;
 }
 
+export const stripCodeFences = (text: string): string => {
+  if (!text) return text;
+  const trimmed = text.trim();
+  const fenceRegex = /^\s*```(?:json|javascript|js|ts|txt)?\s*\r?\n([\s\S]*?)\r?\n```\s*$/i;
+  const match = trimmed.match(fenceRegex);
+  if (match) return match[1].trim();
+  // Also handle inline fenced blocks that may not exactly match above
+  return trimmed.replace(/^```(?:[^\n]*)?\n?/, '').replace(/```$/, '').trim();
+};
+
+export const tryParseJson = <T = unknown>(text: string): T | null => {
+  try {
+    const cleaned = stripCodeFences(text);
+    return JSON.parse(cleaned) as T;
+  } catch {
+    return null;
+  }
+};
+
 export const parseNamesFromText = (text: string): NameResult[] => {
   const names: NameResult[] = [];
   
