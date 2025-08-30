@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, Sparkles } from "lucide-react";
+import { CalendarIcon, Sparkles, Eye } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -23,6 +23,8 @@ const BabyNameForm = () => {
   const [date, setDate] = useState<Date>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [results, setResults] = useState<NameResult[]>([]);
+  const [rawResponse, setRawResponse] = useState<any>(null);
+  const [showDebug, setShowDebug] = useState(false);
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     gender: "",
@@ -43,10 +45,84 @@ const BabyNameForm = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Helper function to convert any data to NameResult format
+  const toNameResult = (item: any): NameResult | null => {
+    if (typeof item === 'string') {
+      return { name: item };
+    }
+    
+    if (typeof item === 'object' && item !== null) {
+      const name = item.name || item.Name || item.babyName || item.baby_name || 
+                   item.fullName || item.full_name || item.title || item.value;
+      
+      if (name && typeof name === 'string') {
+        return {
+          name: name,
+          meaning: item.meaning || item.Meaning || item.description || item.desc,
+          origin: item.origin || item.Origin || item.language || item.Language,
+          gender: item.gender || item.Gender || item.sex || item.Sex
+        };
+      }
+    }
+    
+    return null;
+  };
+
+  // Helper function to normalize various response formats
+  const normalizeResults = (data: any): NameResult[] => {
+    console.log("Normalizing webhook response:", data);
+    
+    if (!data) return [];
+    
+    // Handle arrays directly
+    if (Array.isArray(data)) {
+      const results = data.map(toNameResult).filter(Boolean) as NameResult[];
+      console.log("Normalized array results:", results);
+      return results;
+    }
+    
+    // Handle objects with array properties
+    if (typeof data === 'object') {
+      const possibleArrayKeys = ['names', 'data', 'results', 'items', 'list', 'babyNames', 'baby_names'];
+      
+      for (const key of possibleArrayKeys) {
+        if (data[key] && Array.isArray(data[key])) {
+          const results = data[key].map(toNameResult).filter(Boolean) as NameResult[];
+          console.log(`Normalized results from ${key}:`, results);
+          return results;
+        }
+      }
+      
+      // Try to convert single object to name result
+      const singleResult = toNameResult(data);
+      if (singleResult) {
+        console.log("Normalized single result:", [singleResult]);
+        return [singleResult];
+      }
+    }
+    
+    // Handle string responses (maybe JSON)
+    if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        return normalizeResults(parsed);
+      } catch (e) {
+        // Treat as single name
+        const result = { name: data.trim() };
+        console.log("Normalized string result:", [result]);
+        return [result];
+      }
+    }
+    
+    console.log("Could not normalize results, returning empty array");
+    return [];
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setResults([]);
+    setRawResponse(null);
     
     const submissionData = {
       ...formData,
@@ -64,29 +140,45 @@ const BabyNameForm = () => {
         body: JSON.stringify(submissionData),
       });
 
+      console.log("Response status:", response.status);
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
+
       if (response.ok) {
-        const result = await response.json();
-        console.log("Webhook response:", result);
+        let result: any;
+        const contentType = response.headers.get('content-type');
         
-        // Handle different response formats
-        let nameResults: NameResult[] = [];
-        
-        if (Array.isArray(result)) {
-          nameResults = result;
-        } else if (result.names && Array.isArray(result.names)) {
-          nameResults = result.names;
-        } else if (result.data && Array.isArray(result.data)) {
-          nameResults = result.data;
-        } else if (typeof result === 'object' && result.name) {
-          nameResults = [result];
+        if (contentType && contentType.includes('application/json')) {
+          result = await response.json();
+        } else {
+          // Handle non-JSON responses
+          const textResult = await response.text();
+          console.log("Non-JSON response received:", textResult);
+          try {
+            result = JSON.parse(textResult);
+          } catch (e) {
+            result = textResult;
+          }
         }
         
+        console.log("Webhook response:", result);
+        setRawResponse(result);
+        
+        const nameResults = normalizeResults(result);
         setResults(nameResults);
         
-        toast({
-          title: "Success!",
-          description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you.`,
-        });
+        if (nameResults.length > 0) {
+          toast({
+            title: "Success!",
+            description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you.`,
+          });
+        } else {
+          toast({
+            title: "No Names Found",
+            description: "The webhook returned data but no names could be extracted. Check the debug panel for details.",
+            variant: "destructive",
+          });
+          setShowDebug(true);
+        }
       } else {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -253,6 +345,37 @@ const BabyNameForm = () => {
       </Card>
 
       <NameResults results={results} isLoading={isSubmitting} />
+
+      {/* Debug Panel */}
+      {rawResponse && results.length === 0 && (
+        <Card className="glass-effect border-0 mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="text-orange-400">No Names Found</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDebug(!showDebug)}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                {showDebug ? "Hide" : "View"} Raw Response
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          {showDebug && (
+            <CardContent>
+              <div className="bg-slate-900/50 p-4 rounded-lg overflow-auto max-h-64">
+                <pre className="text-sm text-gray-300">
+                  {JSON.stringify(rawResponse, null, 2)}
+                </pre>
+              </div>
+              <p className="text-sm text-gray-400 mt-2">
+                The webhook returned data but no names could be extracted. Please check if your webhook returns names in the expected format.
+              </p>
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 };
