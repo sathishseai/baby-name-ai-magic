@@ -49,13 +49,26 @@ serve(async (req) => {
   }
 
   try {
+    // Get the Authorization header from the request
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Authorization header is required");
+    }
+
+    // Create Supabase client with the user's JWT token
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
     );
 
     // Get authenticated user
-    const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
@@ -94,7 +107,7 @@ serve(async (req) => {
       console.error("Invalid Razorpay signature");
       
       // Update payment status to failed
-      await supabaseClient
+      const { error: updateError } = await supabaseClient
         .from("payments")
         .update({
           status: "failed",
@@ -103,6 +116,10 @@ serve(async (req) => {
         })
         .eq("id", payment_id)
         .eq("user_id", user.id);
+
+      if (updateError) {
+        console.error("Failed to update payment status:", updateError.message);
+      }
 
       throw new Error("Invalid payment signature");
     }
@@ -139,7 +156,8 @@ serve(async (req) => {
 
     if (processError) {
       console.error("Failed to process payment:", processError);
-      throw new Error("Failed to process payment");
+      console.error("Supabase RPC error details:", processError.message);
+      throw new Error(`Failed to process payment: ${processError.message}`);
     }
 
     console.log("Payment processed successfully");

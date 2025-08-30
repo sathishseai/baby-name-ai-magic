@@ -23,13 +23,26 @@ serve(async (req) => {
   }
 
   try {
+    // Get the Authorization header from the request
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Authorization header is required");
+    }
+
+    // Create Supabase client with the user's JWT token
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
     );
 
     // Get authenticated user
-    const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
@@ -97,7 +110,8 @@ serve(async (req) => {
 
     if (paymentError) {
       console.error("Failed to store payment record:", paymentError);
-      throw new Error("Failed to store payment record");
+      console.error("Supabase error details:", paymentError.message);
+      throw new Error(`Failed to store payment record: ${paymentError.message}`);
     }
 
     console.log("Payment record stored:", payment);
