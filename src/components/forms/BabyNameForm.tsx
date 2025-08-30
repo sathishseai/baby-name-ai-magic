@@ -10,9 +10,12 @@ import { CalendarIcon, Sparkles } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 const BabyNameForm = () => {
   const [date, setDate] = useState<Date>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     gender: "",
     language: "",
@@ -32,10 +35,46 @@ const BabyNameForm = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form data:", { ...formData, birthDate: date });
-    // This will be connected to Supabase and the AI webhook later
+    setIsSubmitting(true);
+    
+    const submissionData = {
+      ...formData,
+      birthDate: date ? format(date, "yyyy-MM-dd") : null
+    };
+    
+    console.log("Submitting data to webhook:", submissionData);
+    
+    try {
+      const response = await fetch('https://n8n.srv930637.hstgr.cloud/webhook-test/getbabyname', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submissionData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Webhook response:", result);
+        toast({
+          title: "Success!",
+          description: "Names are being generated for you.",
+        });
+      } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Error calling webhook:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate names. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -177,9 +216,10 @@ const BabyNameForm = () => {
             <div className="pt-6">
               <Button 
                 type="submit" 
+                disabled={isSubmitting}
                 className="w-full gradient-primary text-white text-lg py-6 hover:scale-105 transition-transform"
               >
-                Generate Names (1 Credit)
+                {isSubmitting ? "Generating..." : "Generate Names (1 Credit)"}
                 <Sparkles className="ml-2 w-5 h-5" />
               </Button>
             </div>
