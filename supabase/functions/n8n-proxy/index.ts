@@ -93,8 +93,8 @@ serve(async (req) => {
       );
     }
 
-    // Use the fixed webhook URL instead of environment variable
-    const n8nWebhookUrl = "https://n8n.srv932017.hstgr.cloud/webhook-test/getbabyname";
+    // Get the n8n webhook URL from environment variables
+    const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || "https://n8n.srv932017.hstgr.cloud/webhook/getbabyname";
     
     console.log('N8N Proxy: Forwarding to webhook URL:', n8nWebhookUrl);
 
@@ -149,6 +149,24 @@ serve(async (req) => {
       } else {
         console.log('N8N Proxy: Credit consumed successfully');
       }
+    } else {
+      // For non-2xx responses, try to parse the error and provide helpful message
+      let errorMessage = 'Failed to generate names';
+      try {
+        const errorData = JSON.parse(responseBody);
+        if (errorData.message?.includes('not registered')) {
+          errorMessage = 'Webhook not active. Please activate the workflow in n8n or try again later.';
+        } else if (errorData.code === 404) {
+          errorMessage = 'Name generation service temporarily unavailable. Please try again later.';
+        } else {
+          errorMessage = errorData.message || errorMessage;
+        }
+      } catch (e) {
+        // If we can't parse the error, use the status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      
+      console.log('N8N Proxy: Webhook returned error, not consuming credit');
     }
 
     // Return the response with CORS headers

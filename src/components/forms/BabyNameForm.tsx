@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -132,6 +131,28 @@ const BabyNameForm = () => {
     return [];
   };
 
+  const getErrorMessage = (error: any): string => {
+    // Handle specific error cases
+    if (error.message?.includes('Insufficient credits')) {
+      return "You don't have enough credits to generate names. Please purchase more credits.";
+    }
+    
+    if (error.message?.includes('Webhook not active')) {
+      return "The name generation service is temporarily unavailable. Please try again in a few minutes.";
+    }
+    
+    if (error.message?.includes('not registered')) {
+      return "The name generation service needs to be activated. Please try again later.";
+    }
+    
+    if (error.message?.includes('Authorization')) {
+      return "Please sign in to generate names.";
+    }
+    
+    // Default error message
+    return error.message || "Failed to generate names. Please try again.";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -174,17 +195,13 @@ const BabyNameForm = () => {
       console.log("Edge Function response:", { data, error });
 
       if (error) {
-        // Handle specific error cases
-        if (error.message?.includes('Insufficient credits')) {
-          toast({
-            title: "Insufficient Credits",
-            description: "You don't have enough credits to generate names. Please purchase more credits.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        throw new Error(error.message || 'Failed to call Edge Function');
+        const errorMessage = getErrorMessage(error);
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
       }
       
       console.log("Webhook response via proxy:", data);
@@ -204,16 +221,17 @@ const BabyNameForm = () => {
       } else {
         toast({
           title: "No Names Found",
-          description: "The webhook returned data but no names could be extracted. Check the debug panel for details.",
+          description: "The service returned data but no names could be extracted. This might be a temporary issue - please try again.",
           variant: "destructive",
         });
         setShowDebug(true);
       }
     } catch (error) {
       console.error("Error calling Edge Function proxy:", error);
+      const errorMessage = getErrorMessage(error);
       toast({
         title: "Error",
-        description: "Failed to generate names. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -408,7 +426,7 @@ const BabyNameForm = () => {
                 </pre>
               </div>
               <p className="text-sm text-gray-400 mt-2">
-                The webhook returned data but no names could be extracted. Please check if your webhook returns names in the expected format.
+                The service returned data but no names could be extracted. This might be a temporary issue with the name generation service.
               </p>
             </CardContent>
           )}
