@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Loader2 } from "lucide-react";
+import { CreditCard, Loader2, Smartphone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,10 @@ const RazorpayPayment = ({ credits, amount, onSuccess }: RazorpayPaymentProps) =
       script.onerror = () => resolve(false);
       document.body.appendChild(script);
     });
+  };
+
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   };
 
   const handlePayment = async () => {
@@ -66,7 +70,7 @@ const RazorpayPayment = ({ credits, amount, onSuccess }: RazorpayPaymentProps) =
 
       const { razorpay_order, payment_id, key_id } = orderData;
 
-      // Configure Razorpay options
+      // Configure Razorpay options with UPI preference
       const options = {
         key: key_id,
         amount: razorpay_order.amount,
@@ -77,6 +81,22 @@ const RazorpayPayment = ({ credits, amount, onSuccess }: RazorpayPaymentProps) =
         prefill: {
           email: user.email,
           name: profile?.full_name || "",
+          contact: profile?.phone || "",
+        },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true,
+          paylater: true,
+        },
+        config: {
+          display: {
+            sequence: ['upi', 'card', 'netbanking', 'wallet', 'paylater'],
+            preferences: {
+              show_default_blocks: true,
+            }
+          }
         },
         theme: {
           color: "#6366f1",
@@ -152,8 +172,8 @@ const RazorpayPayment = ({ credits, amount, onSuccess }: RazorpayPaymentProps) =
         </>
       ) : (
         <>
-          <CreditCard className="mr-2 h-4 w-4" />
-          Pay ₹{amount / 100}
+          <Smartphone className="mr-2 h-4 w-4" />
+          Pay ₹{amount / 100} (UPI & More)
         </>
       )}
     </Button>
