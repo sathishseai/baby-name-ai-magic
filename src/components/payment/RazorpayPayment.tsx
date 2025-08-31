@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Loader2, Smartphone } from "lucide-react";
@@ -81,7 +80,6 @@ const RazorpayPayment = ({ credits, amount, onSuccess }: RazorpayPaymentProps) =
         prefill: {
           email: user.email,
           name: profile?.full_name || "",
-          contact: profile?.phone || "",
         },
         method: {
           upi: true,
