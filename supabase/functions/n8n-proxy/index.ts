@@ -93,20 +93,9 @@ serve(async (req) => {
       );
     }
 
-    // Get the n8n webhook URL from environment variables
-    const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
+    // Use the fixed webhook URL instead of environment variable
+    const n8nWebhookUrl = "https://n8n.srv932017.hstgr.cloud/webhook-test/getbabyname";
     
-    if (!n8nWebhookUrl) {
-      console.error('N8N Proxy: N8N_WEBHOOK_URL environment variable not set');
-      return new Response(
-        JSON.stringify({ error: 'Webhook URL not configured' }), 
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
     console.log('N8N Proxy: Forwarding to webhook URL:', n8nWebhookUrl);
 
     // Get the request body
