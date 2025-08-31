@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import NameResults from "@/components/results/NameResults";
 import { parseNamesFromText, tryParseJson, stripCodeFences, type NameResult } from "@/utils/nameParser";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,7 +22,7 @@ const BabyNameForm = () => {
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [showDebug, setShowDebug] = useState(false);
   const { toast } = useToast();
-  const { user, profile, refetchProfile } = useAuth();
+  const { user, profile } = useAuth();
   const [formData, setFormData] = useState({
     gender: "",
     language: "",
@@ -132,9 +132,9 @@ const BabyNameForm = () => {
   };
 
   const getErrorMessage = (error: any): string => {
-    // Handle specific error cases
-    if (error.message?.includes('Insufficient credits')) {
-      return "You don't have enough credits to generate names. Please purchase more credits.";
+    // Handle specific error cases for network/fetch errors
+    if (error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
+      return "Unable to connect to the name generation service. Please check your internet connection and try again.";
     }
     
     if (error.message?.includes('Webhook not active')) {
@@ -145,10 +145,6 @@ const BabyNameForm = () => {
       return "The name generation service needs to be activated. Please try again later.";
     }
     
-    if (error.message?.includes('Authorization')) {
-      return "Please sign in to generate names.";
-    }
-    
     // Default error message
     return error.message || "Failed to generate names. Please try again.";
   };
@@ -156,24 +152,13 @@ const BabyNameForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if user is authenticated
+    // Check if user is authenticated (optional, since we're not using credits)
     if (!user) {
       toast({
-        title: "Authentication required",
-        description: "Please sign in to generate names.",
-        variant: "destructive",
+        title: "Authentication recommended",
+        description: "For the best experience, please sign in.",
+        variant: "default",
       });
-      return;
-    }
-
-    // Check if user has sufficient credits
-    if (!profile || profile.credits < 1) {
-      toast({
-        title: "Insufficient credits",
-        description: "You need at least 1 credit to generate names. Please purchase credits to continue.",
-        variant: "destructive",
-      });
-      return;
     }
 
     setIsSubmitting(true);
@@ -185,26 +170,43 @@ const BabyNameForm = () => {
       birthDate: date ? format(date, "yyyy-MM-dd") : null
     };
     
-    console.log("Submitting data to Supabase Edge Function proxy:", submissionData);
+    console.log("Submitting data directly to n8n webhook:", submissionData);
     
     try {
-      const { data, error } = await supabase.functions.invoke('n8n-proxy', {
-        body: submissionData,
+      const response = await fetch("https://n8n.srv932017.hstgr.cloud/webhook/getbabyname", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submissionData),
       });
 
-      console.log("Edge Function response:", { data, error });
+      console.log("Webhook response:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
 
-      if (error) {
-        const errorMessage = getErrorMessage(error);
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        return;
+      if (!response.ok) {
+        let errorMessage = 'Failed to generate names';
+        try {
+          const errorData = await response.json();
+          if (errorData.message?.includes('not registered')) {
+            errorMessage = 'The name generation service needs to be activated. Please try again later.';
+          } else if (response.status === 404) {
+            errorMessage = 'Name generation service temporarily unavailable. Please try again later.';  
+          } else {
+            errorMessage = errorData.message || errorMessage;
+          }
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
       }
       
-      console.log("Webhook response via proxy:", data);
+      const data = await response.json();
+      console.log("Direct webhook response:", data);
       setRawResponse(data);
       
       const nameResults = normalizeResults(data);
@@ -213,11 +215,8 @@ const BabyNameForm = () => {
       if (nameResults.length > 0) {
         toast({
           title: "Success!",
-          description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you. 1 credit has been deducted.`,
+          description: `Generated ${nameResults.length} name${nameResults.length !== 1 ? 's' : ''} for you.`,
         });
-        
-        // Refresh the user profile to get updated credit count
-        await refetchProfile();
       } else {
         toast({
           title: "No Names Found",
@@ -227,7 +226,7 @@ const BabyNameForm = () => {
         setShowDebug(true);
       }
     } catch (error) {
-      console.error("Error calling Edge Function proxy:", error);
+      console.error("Error calling n8n webhook directly:", error);
       const errorMessage = getErrorMessage(error);
       toast({
         title: "Error",
@@ -386,13 +385,10 @@ const BabyNameForm = () => {
             <div className="pt-6">
               <Button 
                 type="submit" 
-                disabled={isSubmitting || !user || (profile && profile.credits < 1)}
+                disabled={isSubmitting}
                 className="w-full gradient-primary text-white text-lg py-6 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                {isSubmitting ? "Generating..." : 
-                 !user ? "Sign In Required" :
-                 (profile && profile.credits < 1) ? "Insufficient Credits" :
-                 "Generate Names (1 Credit)"}
+                {isSubmitting ? "Generating..." : "Generate Names"}
                 <Sparkles className="ml-2 w-5 h-5" />
               </Button>
             </div>
